@@ -1,8 +1,8 @@
-
 /* Krishana Jewellers — API layer
    - Single-source-of-truth fetcher with cache fallback
    - Never treats localStorage as authoritative
-   - Hides raw errors from customers */
+   - Hides raw errors from customers
+   - Uses URL query params for tokens (Apps Script cannot handle CORS preflight) */
 (function(){
   const CFG = window.APP_CONFIG;
 
@@ -41,7 +41,7 @@
     }catch(e){ /* quota — ignore */ }
   }
 
-  /* ---------- bundled fallback (used only if API fails AND no cache) ---------- */
+  /* ---------- bundled fallback ---------- */
   function bundledFallback(){
     return {
       settings: Object.assign({}, CFG.DEFAULT_SETTINGS),
@@ -70,7 +70,6 @@
       }
       throw new Error(res && res.error && res.error.code || 'api_error');
     }catch(err){
-      /* Fall back to cache, then to bundled defaults */
       const cached = readCache();
       if(cached){
         const data = cached.data;
@@ -88,7 +87,7 @@
     const url = CFG.API_BASE + '?action=submitEnquiry&v=' + CFG.API_VERSION;
     return fetchJSON(url, {
       method:'POST',
-      headers:{'Content-Type':'text/plain;charset=utf-8'}, // avoids CORS preflight on Apps Script
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
       body: JSON.stringify(payload)
     }, 12000);
   }
@@ -101,8 +100,8 @@
     }, 12000);
   }
 
-  /* ---------- admin endpoints (session token required) ---------- */
-  function authHeader(token){ return { 'X-Session-Token': token }; }
+  /* ---------- admin endpoints ---------- */
+
   async function adminLogin(password){
     const url = CFG.API_BASE + '?action=login&v=' + CFG.API_VERSION;
     return fetchJSON(url, {
@@ -111,6 +110,7 @@
       body: JSON.stringify({password: String(password||'')})
     }, 12000);
   }
+
   async function adminLogout(token){
     const url = CFG.API_BASE + '?action=logout&v=' + CFG.API_VERSION;
     return fetchJSON(url, {
@@ -119,24 +119,32 @@
       body: JSON.stringify({token: String(token||'')})
     }, 8000);
   }
+
+  /* Token goes in the URL — custom headers trigger CORS preflight,
+     which Apps Script Web Apps cannot answer. */
   async function adminData(token){
-    const url = CFG.API_BASE + '?action=adminData&v=' + CFG.API_VERSION;
-    return fetchJSON(url, {method:'GET', cache:'no-store', headers: authHeader(token)}, 12000);
+    const url = CFG.API_BASE + '?action=adminData&v=' + CFG.API_VERSION
+              + '&token=' + encodeURIComponent(token || '');
+    return fetchJSON(url, {method:'GET', cache:'no-store'}, 12000);
   }
+
   async function adminMutation(action, token, payload){
-    const url = CFG.API_BASE + '?action=' + encodeURIComponent(action) + '&v=' + CFG.API_VERSION;
+    const url = CFG.API_BASE + '?action=' + encodeURIComponent(action)
+              + '&v=' + CFG.API_VERSION;
     return fetchJSON(url, {
       method:'POST',
       headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify(Object.assign({}, payload || {}, {token}))
+      body: JSON.stringify(Object.assign({}, payload || {}, {token: token}))
     }, 15000);
   }
+
   async function ping(token){
-    const url = CFG.API_BASE + '?action=ping&v=' + CFG.API_VERSION;
     const t0 = performance.now();
+    const url = CFG.API_BASE + '?action=ping&v=' + CFG.API_VERSION
+              + (token ? '&token=' + encodeURIComponent(token) : '');
     try{
-      const res = await fetchJSON(url, {method:'GET', cache:'no-store', headers: token ? authHeader(token) : {}}, 6000);
-      return { ok: !!(res && res.success), ms: Math.round(performance.now() - t0), raw: res };
+      const r = await fetchJSON(url, {method:'GET', cache:'no-store'}, 6000);
+      return { ok: !!(r && r.success), ms: Math.round(performance.now() - t0), raw: r };
     }catch(e){
       return { ok:false, ms: Math.round(performance.now() - t0), error: String(e.message||e) };
     }
