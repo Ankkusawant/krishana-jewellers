@@ -6,7 +6,7 @@
   window.APP_CONFIG = {
     /* ---- API -------------------------------------------------------- */
     /* Replace DEPLOYMENT_ID with your Apps Script Web App deployment ID. */
-    API_BASE: 'https://script.google.com/macros/s/AKfycbwzzUr-aesQExxPm07DqCoGHx1i6GEYst8UQq1GHT3Y3B0bj4HjkEbxEsPGQLi1FgSbLw/exec',
+    API_BASE: 'https://script.google.com/macros/s/AKfycbwbEPP3ZAYzUuaEnGGaCN-DJZ9DM7lpo3wV4ZRAtuUBrrY6VWwFfRtRD1Yg4e6SCMnLrQ/exec',
     API_VERSION: 'v1',
 
     /* ---- Cache ------------------------------------------------------ */
